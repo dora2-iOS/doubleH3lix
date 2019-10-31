@@ -93,7 +93,7 @@ double uptime(){
             });
         }else{
             int ut = 0;
-            while ((ut = 50 - uptime()) > 0) {
+            while ((ut = 30 - uptime()) > 0) {
                 NSString *msg = [NSString stringWithFormat:@"Waiting %d seconds\nfor system to cool\ndown after boot",ut];
                 postProgress(msg);
                 sleep(1);

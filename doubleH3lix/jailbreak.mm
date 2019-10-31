@@ -11,7 +11,7 @@ extern "C"{
 #include <stdint.h>
 
 #include "common.h"
-#include "v0rtex.h"
+#include "exploit.h"
 
 typedef mach_port_t io_service_t;
 typedef mach_port_t io_connect_t;
@@ -99,9 +99,9 @@ void resume_all_threads() {
     }
 }
 
-kern_return_t cb(task_t tfp0_, kptr_t kbase, void *data){
+kern_return_t sockport2(task_t tfp0_, kptr_t kbase, void *data){
     resume_all_threads();
-    LOG("done v0rtex!\n");
+    LOG("done sockport2!\n");
     tfp0 = tfp0_;
     tihmstar::offsetfinder64 *fi = static_cast<tihmstar::offsetfinder64 *>(data);
 
@@ -116,6 +116,7 @@ kern_return_t cb(task_t tfp0_, kptr_t kbase, void *data){
     return KERN_SUCCESS;
 }
 
+/*
 size_t kread(uint64_t where, void *p, size_t size){
     int rv;
     size_t offset = 0;
@@ -133,7 +134,7 @@ size_t kread(uint64_t where, void *p, size_t size){
     }
     return offset;
 }
-
+*/
 uint64_t kread_uint64(uint64_t where){
     uint64_t value = 0;
     size_t sz = kread(where, &value, sizeof(value));
@@ -145,7 +146,7 @@ uint32_t kread_uint32(uint64_t where){
     size_t sz = kread(where, &value, sizeof(value));
     return (sz == sizeof(value)) ? value : 0;
 }
-
+/*
 size_t kwrite(uint64_t where, const void *p, size_t size){
     int rv;
     size_t offset = 0;
@@ -163,7 +164,7 @@ size_t kwrite(uint64_t where, const void *p, size_t size){
     }
     return offset;
 }
-
+*/
 size_t kwrite_uint64(uint64_t where, uint64_t value){
     return kwrite(where, &value, sizeof(value));
 }
@@ -580,12 +581,13 @@ remappage[remapcnt++] = (x & (~PMK));\
     int mntr = mount("hfs", "/", 0x10000, &nm);
     printf("Mount succeeded? %d\n",mntr);
 
+    /*
     if (open("/v0rtex", O_CREAT | O_RDWR, 0644)>=0){
         printf("write test success!\n");
         remove("/v0rtex");
     }else
         printf("[!] write test failed!\n");
-
+     */
 
     NSLog(@"enabled patches");
 }
@@ -611,33 +613,20 @@ extern "C" int jailbreak(void)
 {
     tihmstar::offsetfinder64 fi("/System/Library/Caches/com.apple.kernelcaches/kernelcache");
 
-    offsets_t *off = NULL;
-    try {
-        off = get_offsets(&fi);
-    } catch (tihmstar::exception &e) {
-        LOG("Failed jailbreak!: %s [%u]", e.what(), e.code());
-        NSString *err = [NSString stringWithFormat:@"Offset Error: %d",e.code()];
-        postProgress(err);
-        return -1;
-    }catch (std::exception &e) {
-        LOG("Failed jailbreak!: %s", e.what());
-        NSString *err = [NSString stringWithFormat:@"FATAL offset Error:\n%s",e.what()];
-        postProgress(err);
-        return -1;
-    }
-
-    LOG("v0rtex\n");
+    LOG("sockport2\n");
     suspend_all_threads();
-    if(v0rtex(off, &cb, &fi)){
-        resume_all_threads();
-        postProgress(@"Kernelexploit failed");
-        printf("Kernelexploit failed, goodbye...\n");
-        sleep(3);
-        die();
-    }
+    
+    mach_port_t kernel_task = get_tfp0();
+    uint64_t kernel_base = get_kernel_base(kernel_task);
+    
+    sockport2(kernel_task, kernel_base, &fi);
+
     LOG("done kernelpatches!");
     runLaunchDaemons();
-    printf("ok\n");
+
+    wk64(ourproc + 0x100, orig_ucred);
+    setuid(orig_uid);
+    
     return 0;
 }
 
